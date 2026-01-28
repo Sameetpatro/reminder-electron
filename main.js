@@ -10,8 +10,8 @@ const dataPath = path.join(app.getPath('userData'), 'data.json');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1400,
+    height: 900,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -78,9 +78,10 @@ function loadData() {
   return {
     reminders: [],
     history: [],
-    skills: [],
-    schedule: [],
-    subjects: [],
+    resumeSkills: [],
+    learnedSkills: [],
+    resumePath: null,
+    classes: [],
     attendance: [],
     emailConfig: null
   };
@@ -117,6 +118,11 @@ ipcMain.handle('update-reminder-status', (event, { id, status }) => {
     if (status === 'done' || status === 'cancelled') {
       data.history.push({ ...reminder, completedAt: new Date().toISOString() });
       data.reminders = data.reminders.filter(r => r.id !== id);
+      
+      // If done, extract skills from reminder text
+      if (status === 'done') {
+        extractSkillsFromReminder(data, reminder);
+      }
     }
     saveData(data);
   }
@@ -130,37 +136,32 @@ ipcMain.handle('delete-reminder', (event, id) => {
   return data;
 });
 
-ipcMain.handle('save-skill', (event, skill) => {
+ipcMain.handle('save-resume-skills', (event, { skills, resumePath }) => {
   const data = loadData();
-  skill.id = Date.now().toString();
-  skill.addedAt = new Date().toISOString();
-  data.skills.push(skill);
-  saveData(data);
-  return skill;
-});
-
-ipcMain.handle('delete-skill', (event, id) => {
-  const data = loadData();
-  data.skills = data.skills.filter(s => s.id !== id);
+  data.resumeSkills = skills;
+  data.resumePath = resumePath;
   saveData(data);
   return data;
 });
 
-ipcMain.handle('save-schedule', (event, scheduleItems) => {
+ipcMain.handle('save-class', (event, classData) => {
   const data = loadData();
-  data.schedule = scheduleItems;
+  classData.id = Date.now().toString();
+  data.classes.push(classData);
   saveData(data);
   return data;
 });
 
-ipcMain.handle('save-subjects', (event, subjects) => {
+ipcMain.handle('delete-class', (event, id) => {
   const data = loadData();
-  data.subjects = subjects;
+  data.classes = data.classes.filter(c => c.id !== id);
+  // Also remove attendance records for this class
+  data.attendance = data.attendance.filter(a => a.classId !== id);
   saveData(data);
   return data;
 });
 
-ipcMain.handle('mark-attendance', (event, attendanceRecord) => {
+ipcMain.handle('save-attendance', (event, attendanceRecord) => {
   const data = loadData();
   attendanceRecord.id = Date.now().toString();
   attendanceRecord.timestamp = new Date().toISOString();
@@ -175,6 +176,92 @@ ipcMain.handle('save-email-config', (event, config) => {
   saveData(data);
   return config;
 });
+
+// Extract technical skills from reminder text
+function extractSkillsFromReminder(data, reminder) {
+  const commonSkills = [
+    'javascript', 'js', 'python', 'java', 'c++', 'cpp', 'c', 'c#', 'csharp',
+    'react', 'reactjs', 'react.js', 'angular', 'vue', 'vuejs', 'vue.js',
+    'node', 'nodejs', 'node.js', 'express', 'expressjs', 'django', 'flask',
+    'spring', 'springboot', 'spring boot', 'html', 'css', 'sass', 'scss',
+    'typescript', 'ts', 'sql', 'mysql', 'postgresql', 'postgres', 'mongodb',
+    'redis', 'docker', 'kubernetes', 'k8s', 'aws', 'azure', 'gcp',
+    'git', 'github', 'gitlab', 'jenkins', 'ci/cd', 'cicd',
+    'machine learning', 'ml', 'deep learning', 'dl', 'ai', 'artificial intelligence',
+    'tensorflow', 'pytorch', 'keras', 'scikit-learn', 'sklearn',
+    'data structures', 'algorithms', 'dsa', 'oop', 'object oriented programming',
+    'rest', 'restful', 'api', 'graphql', 'websocket',
+    'android', 'ios', 'swift', 'kotlin', 'flutter', 'react native',
+    'unity', 'unreal', 'game development',
+    'photoshop', 'illustrator', 'figma', 'sketch', 'ui/ux', 'ux/ui'
+  ];
+
+  const text = reminder.text.toLowerCase();
+  const foundSkills = [];
+
+  for (const skill of commonSkills) {
+    if (text.includes(skill.toLowerCase())) {
+      // Normalize the skill name
+      const normalizedSkill = normalizeSkillName(skill);
+      if (!foundSkills.includes(normalizedSkill)) {
+        foundSkills.push(normalizedSkill);
+      }
+    }
+  }
+
+  // Add to learned skills if not already present
+  if (!data.learnedSkills) data.learnedSkills = [];
+  
+  for (const skill of foundSkills) {
+    if (!data.learnedSkills.includes(skill)) {
+      data.learnedSkills.push(skill);
+    }
+  }
+}
+
+function normalizeSkillName(skill) {
+  const skillMap = {
+    'js': 'JavaScript',
+    'javascript': 'JavaScript',
+    'ts': 'TypeScript',
+    'typescript': 'TypeScript',
+    'reactjs': 'React',
+    'react.js': 'React',
+    'react': 'React',
+    'nodejs': 'Node.js',
+    'node.js': 'Node.js',
+    'node': 'Node.js',
+    'vuejs': 'Vue.js',
+    'vue.js': 'Vue.js',
+    'vue': 'Vue.js',
+    'python': 'Python',
+    'java': 'Java',
+    'cpp': 'C++',
+    'c++': 'C++',
+    'csharp': 'C#',
+    'c#': 'C#',
+    'html': 'HTML',
+    'css': 'CSS',
+    'mongodb': 'MongoDB',
+    'mysql': 'MySQL',
+    'postgresql': 'PostgreSQL',
+    'postgres': 'PostgreSQL',
+    'docker': 'Docker',
+    'kubernetes': 'Kubernetes',
+    'k8s': 'Kubernetes',
+    'aws': 'AWS',
+    'azure': 'Azure',
+    'gcp': 'Google Cloud',
+    'ml': 'Machine Learning',
+    'machine learning': 'Machine Learning',
+    'dl': 'Deep Learning',
+    'deep learning': 'Deep Learning',
+    'ai': 'Artificial Intelligence',
+    'artificial intelligence': 'Artificial Intelligence'
+  };
+
+  return skillMap[skill.toLowerCase()] || skill.charAt(0).toUpperCase() + skill.slice(1);
+}
 
 function startReminderCheck() {
   reminderCheckInterval = setInterval(() => {
@@ -193,22 +280,50 @@ function checkReminders() {
     const timeLeft = deadline - now;
     const percentPassed = ((totalDuration - timeLeft) / totalDuration) * 100;
 
-    // Check for 50% warning
-    if (percentPassed >= 50 && !reminder.notificationsSent.includes('50%')) {
-      sendNotification(reminder, '50% time passed');
-      reminder.notificationsSent.push('50%');
-      saveData(data);
+    const isImportant = reminder.important;
+
+    // Important reminders: 50%, 80%, 95%
+    // Normal reminders: 50%, 90%
+
+    if (isImportant) {
+      // 50% notification
+      if (percentPassed >= 50 && percentPassed < 51 && !reminder.notificationsSent.includes('50%')) {
+        sendNotification(reminder, '50% time passed');
+        reminder.notificationsSent.push('50%');
+        saveData(data);
+      }
+
+      // 80% notification
+      if (percentPassed >= 80 && percentPassed < 81 && !reminder.notificationsSent.includes('80%')) {
+        sendNotification(reminder, '80% time passed');
+        reminder.notificationsSent.push('80%');
+        saveData(data);
+      }
+
+      // 95% notification
+      if (percentPassed >= 95 && percentPassed < 96 && !reminder.notificationsSent.includes('95%')) {
+        sendNotification(reminder, '95% time passed - Almost due!');
+        reminder.notificationsSent.push('95%');
+        saveData(data);
+      }
+    } else {
+      // 50% notification
+      if (percentPassed >= 50 && percentPassed < 51 && !reminder.notificationsSent.includes('50%')) {
+        sendNotification(reminder, '50% time passed');
+        reminder.notificationsSent.push('50%');
+        saveData(data);
+      }
+
+      // 90% notification
+      if (percentPassed >= 90 && percentPassed < 91 && !reminder.notificationsSent.includes('90%')) {
+        const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
+        sendNotification(reminder, `${hoursLeft} hour(s) left`);
+        reminder.notificationsSent.push('90%');
+        saveData(data);
+      }
     }
 
-    // Check for 90% warning (1 hour left for short tasks, 6 hours for long)
-    if (percentPassed >= 90 && !reminder.notificationsSent.includes('90%')) {
-      const hoursLeft = Math.floor(timeLeft / (1000 * 60 * 60));
-      sendNotification(reminder, `${hoursLeft} hour(s) left`);
-      reminder.notificationsSent.push('90%');
-      saveData(data);
-    }
-
-    // Check for deadline
+    // Deadline reached notification for all
     if (timeLeft <= 0 && !reminder.notificationsSent.includes('100%')) {
       sendNotification(reminder, 'Deadline reached!');
       reminder.notificationsSent.push('100%');
@@ -235,7 +350,7 @@ async function sendEmailNotification(reminder, message) {
   if (!data.emailConfig || !data.emailConfig.enabled) return;
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       service: data.emailConfig.service,
       auth: {
         user: data.emailConfig.email,
@@ -254,11 +369,12 @@ async function sendEmailNotification(reminder, message) {
         <p>Deadline: ${new Date(reminder.deadline).toLocaleString()}</p>
         <p>Important: ${reminder.important ? 'Yes' : 'No'}</p>
         <hr>
-        <p>Mark as done: <a href="reminder://done/${reminder.id}">Done</a></p>
+        <p style="color: #7f8c8d; font-size: 12px;">This is an automated reminder from your Reminder App.</p>
       `
     };
 
     await transporter.sendMail(mailOptions);
+    console.log('Email notification sent successfully');
   } catch (error) {
     console.error('Error sending email:', error);
   }

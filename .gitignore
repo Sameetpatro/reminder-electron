@@ -4,15 +4,34 @@ node_modules/
 # Build output
 dist/
 win-unpacked/
+*.AppImage
+*.deb
+*.dmg
+*.exe
+*.zip
 
 # Logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # OS
 .DS_Store
 Thumbs.db
+.directory
 
 # Environment variables
 .env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/

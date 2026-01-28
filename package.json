@@ -1,16 +1,70 @@
 {
-  "name": "reminder-app",
+  "name": "reminder-electron",
   "version": "1.0.0",
-  "description": "Desktop Reminder App with Email Notifications",
+  "description": "Desktop Reminder App with Email Notifications, Skills Tracking, and Attendance Management",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
   },
-  "keywords": [],
-  "author": "",
+  "build": {
+    "appId": "com.reminder.app",
+    "productName": "Reminder App",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "renderer.js",
+      "index.html",
+      "styles.css",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "keywords": [
+    "reminder",
+    "productivity",
+    "attendance",
+    "skills",
+    "desktop"
+  ],
+  "author": "Sameet Patro",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^28.0.0"
+    "electron": "^28.0.0",
+    "electron-builder": "^24.6.4"
   },
   "dependencies": {
     "nodemailer": "^6.9.7"

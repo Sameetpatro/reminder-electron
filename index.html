@@ -8,13 +8,25 @@
 </head>
 <body>
   <div class="container">
-    <nav class="sidebar">
-      <h2>Reminder App</h2>
+    <header class="top-header">
+      <div class="header-left">
+        <h1>Reminder App</h1>
+      </div>
+      <div class="header-right">
+        <button id="refresh-btn" class="refresh-btn" title="Refresh data">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+          </svg>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <nav class="horizontal-nav">
       <ul>
         <li><a href="#" data-section="reminders" class="nav-link active">Reminders</a></li>
         <li><a href="#" data-section="history" class="nav-link">History</a></li>
-        <li><a href="#" data-section="skills" class="nav-link">Technical Skills</a></li>
-        <li><a href="#" data-section="schedule" class="nav-link">Daily Schedule</a></li>
+        <li><a href="#" data-section="skills" class="nav-link">Resume & Skills Tracker</a></li>
         <li><a href="#" data-section="attendance" class="nav-link">Attendance</a></li>
         <li><a href="#" data-section="settings" class="nav-link">Email Settings</a></li>
       </ul>
@@ -26,7 +38,23 @@
         <h1>Reminders</h1>
         <div class="add-form">
           <input type="text" id="reminder-text" placeholder="What do you need to do?" />
+          
+          <div class="deadline-type-selector">
+            <label>
+              <input type="radio" name="deadline-type" value="date" checked />
+              <span>Specific Date</span>
+            </label>
+            <label>
+              <input type="radio" name="deadline-type" value="days" />
+              <span>In X Days</span>
+            </label>
+          </div>
+
           <input type="datetime-local" id="reminder-deadline" />
+          <div id="days-input" style="display: none;">
+            <input type="number" id="reminder-days" placeholder="Number of days" min="1" />
+          </div>
+
           <label class="toggle-label">
             <input type="checkbox" id="reminder-important" />
             <span>Important</span>
@@ -42,58 +70,123 @@
         <div id="history-list" class="list"></div>
       </section>
 
-      <!-- Technical Skills Section -->
+      <!-- Resume & Skills Tracker Section -->
       <section id="skills" class="section">
-        <h1>Technical Skills Tracker</h1>
-        <div class="add-form">
-          <input type="text" id="skill-name" placeholder="Skill name (e.g., React.js)" />
-          <select id="skill-level">
-            <option value="beginner">Beginner</option>
-            <option value="intermediate">Intermediate</option>
-            <option value="advanced">Advanced</option>
-            <option value="expert">Expert</option>
-          </select>
-          <button id="add-skill-btn">Add Skill</button>
+        <h1>Resume & Skills Tracker</h1>
+        
+        <div class="resume-upload-section">
+          <h3>Upload Your Resume</h3>
+          <div class="upload-area">
+            <input type="file" id="resume-upload" accept=".pdf,.doc,.docx" style="display: none;" />
+            <button id="upload-resume-btn" class="btn-primary">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+              </svg>
+              Upload Resume
+            </button>
+            <span id="resume-filename" class="filename-display"></span>
+          </div>
         </div>
-        <div id="skills-list" class="list"></div>
-      </section>
 
-      <!-- Daily Schedule Section -->
-      <section id="schedule" class="section">
-        <h1>Daily Schedule</h1>
-        <div class="schedule-form">
-          <div id="schedule-items"></div>
-          <button id="add-schedule-item-btn">+ Add Time Slot</button>
-          <button id="save-schedule-btn">Save Schedule</button>
+        <div class="skills-comparison">
+          <div class="skills-column">
+            <h3>Skills in Your Resume</h3>
+            <div id="resume-skills-list" class="skills-grid"></div>
+          </div>
+          
+          <div class="skills-column">
+            <h3>Skills Learned via Completed Reminders</h3>
+            <div id="learned-skills-list" class="skills-grid"></div>
+          </div>
+        </div>
+
+        <div class="skills-stats">
+          <div class="stat-card">
+            <h4>Resume Skills</h4>
+            <p class="stat-number" id="resume-skills-count">0</p>
+          </div>
+          <div class="stat-card">
+            <h4>Learned Skills</h4>
+            <p class="stat-number" id="learned-skills-count">0</p>
+          </div>
+          <div class="stat-card">
+            <h4>New Skills Not in Resume</h4>
+            <p class="stat-number" id="new-skills-count">0</p>
+          </div>
         </div>
       </section>
 
       <!-- Attendance Section -->
       <section id="attendance" class="section">
         <h1>Attendance Tracker</h1>
-        <div class="attendance-setup">
-          <h3>Subjects</h3>
-          <div class="add-form">
-            <input type="text" id="subject-name" placeholder="Subject name" />
-            <button id="add-subject-btn">Add Subject</button>
-          </div>
-          <div id="subjects-list" class="subjects-grid"></div>
+        
+        <div class="attendance-controls">
+          <button id="show-timetable-btn" class="btn-primary">Show Timetable</button>
+          <button id="add-class-btn" class="btn-primary">Add Class</button>
+          <button id="mark-attendance-btn" class="btn-primary">Mark Attendance</button>
         </div>
-        <div class="attendance-tracker">
-          <h3>Mark Attendance</h3>
-          <div class="add-form">
-            <select id="attendance-subject"></select>
-            <select id="attendance-day">
+
+        <!-- Add Class Modal Content -->
+        <div id="add-class-form" class="form-section" style="display: none;">
+          <h3>Add New Class</h3>
+          <div class="form-grid">
+            <input type="text" id="class-name" placeholder="Class Name (e.g., Data Structures)" />
+            <input type="text" id="class-code" placeholder="Class Code (e.g., CS301)" />
+            <input type="text" id="professor-name" placeholder="Professor Name" />
+            <select id="class-day">
+              <option value="">Select Day</option>
               <option value="Monday">Monday</option>
               <option value="Tuesday">Tuesday</option>
               <option value="Wednesday">Wednesday</option>
               <option value="Thursday">Thursday</option>
               <option value="Friday">Friday</option>
+              <option value="Saturday">Saturday</option>
+            </select>
+            <input type="time" id="class-start-time" placeholder="Start Time" />
+            <input type="time" id="class-end-time" placeholder="End Time" />
+          </div>
+          <div class="form-actions">
+            <button id="save-class-btn" class="btn-success">Save Class</button>
+            <button id="cancel-class-btn" class="btn-cancel">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Mark Attendance Form -->
+        <div id="mark-attendance-form" class="form-section" style="display: none;">
+          <h3>Mark Attendance</h3>
+          <div class="form-grid">
+            <select id="attendance-class">
+              <option value="">Select Class</option>
             </select>
             <input type="date" id="attendance-date" />
-            <button id="mark-attendance-btn">Mark Present</button>
+            <select id="attendance-status">
+              <option value="present">Present</option>
+              <option value="absent">Absent</option>
+            </select>
           </div>
-          <div id="attendance-stats" class="stats"></div>
+          <div class="form-actions">
+            <button id="save-attendance-btn" class="btn-success">Save Attendance</button>
+            <button id="cancel-attendance-btn" class="btn-cancel">Cancel</button>
+          </div>
+        </div>
+
+        <!-- Timetable View -->
+        <div id="timetable-view" class="timetable-container" style="display: none;">
+          <h3>Weekly Timetable</h3>
+          <button id="close-timetable-btn" class="btn-cancel">Close Timetable</button>
+          <div id="timetable-grid"></div>
+        </div>
+
+        <!-- Attendance Statistics -->
+        <div class="attendance-stats-section">
+          <h3>Attendance Statistics</h3>
+          <div id="attendance-stats-grid" class="stats-grid"></div>
+        </div>
+
+        <!-- Classes List -->
+        <div class="classes-list-section">
+          <h3>Your Classes</h3>
+          <div id="classes-list" class="classes-grid"></div>
         </div>
       </section>
 
@@ -137,3 +230,26 @@
   <script src="renderer.js"></script>
 </body>
 </html>
+
+
+<!-- i want some changes:
+
+
+
+1) keep menu bar (reminders, history, Technical skills, etc) on top / bottom
+
+2) at the top of the app home screen, keep a refresh button  (if email updation is done in case - to fetch those details)
+
+3) in reminder section, keep 2 options, one is date deadline like before 26 march 2026 and other is like (in 10 days)
+
+4) for important tags, keep 3 deadline notification, if device is turned on then directly to pc else mail the notification and for normal, keep 2 (50% time passed, 80% time passed and 95% time passed for important and for normal, 50% and 90%)
+
+5) In technical skill, i want a huge changes, a) change this into resume scanner like ats scanner where it basically scans all skills from resume and use some feature (maybe langchain) to identify if the current reminder is being added contains any skill which is not available at my resume. now i will explain how it works, at first, it should allow me to add my resume.... (i can change that anytime i want) and it should scan all technical skills (almost all regarding computer science engineer) and save it locally. once i add some reminder like react.js which is not available at my resume and if i complete it, it should track it, it should show like... skills in your resume is this ... that... and skills from your reminders which you have completed: is this... that... THATS IT ... and even if i change my resume, it should scan that resume too and show like what your resume have and what you have learned using this app
+
+6) Remove daily schedule section totally
+
+7) For attendance section, i will mention all classes details and your work is to track my attendance , it should have a option called show timetable, design it cool and along with keep a section called professor name as well and also show my attendance details as well. make it dynamic so that i can add past data 
+
+8) Keep email section carefully and it should work
+
+9) Make it such that, i can install this app and use it anywhere like in different devices -->

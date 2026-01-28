@@ -1,11 +1,14 @@
 const { ipcRenderer } = require('electron');
+const fs = require('fs');
+const path = require('path');
 
 let appData = {
   reminders: [],
   history: [],
-  skills: [],
-  schedule: [],
-  subjects: [],
+  resumeSkills: [],
+  learnedSkills: [],
+  resumePath: null,
+  classes: [],
   attendance: [],
   emailConfig: null
 };
@@ -13,18 +16,22 @@ let appData = {
 // Load data on startup
 window.addEventListener('DOMContentLoaded', async () => {
   appData = await ipcRenderer.invoke('load-data');
-  renderReminders();
-  renderHistory();
-  renderSkills();
-  renderSchedule();
-  renderSubjects();
-  renderAttendanceStats();
-  loadEmailSettings();
+  renderAll();
   setupEventListeners();
 });
 
-// Navigation
+function renderAll() {
+  renderReminders();
+  renderHistory();
+  renderSkills();
+  renderClasses();
+  renderAttendanceStats();
+  loadEmailSettings();
+}
+
+// Navigation and Event Listeners
 function setupEventListeners() {
+  // Navigation
   const navLinks = document.querySelectorAll('.nav-link');
   navLinks.forEach(link => {
     link.addEventListener('click', (e) => {
@@ -34,21 +41,57 @@ function setupEventListeners() {
     });
   });
 
+  // Refresh button
+  document.getElementById('refresh-btn').addEventListener('click', async () => {
+    appData = await ipcRenderer.invoke('load-data');
+    renderAll();
+    showNotification('Data refreshed successfully!', 'success');
+  });
+
+  // Deadline type toggle
+  document.querySelectorAll('input[name="deadline-type"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      const deadlineInput = document.getElementById('reminder-deadline');
+      const daysInput = document.getElementById('days-input');
+      
+      if (e.target.value === 'date') {
+        deadlineInput.style.display = 'block';
+        daysInput.style.display = 'none';
+      } else {
+        deadlineInput.style.display = 'none';
+        daysInput.style.display = 'block';
+      }
+    });
+  });
+
   // Reminder events
   document.getElementById('add-reminder-btn').addEventListener('click', addReminder);
 
-  // Skill events
-  document.getElementById('add-skill-btn').addEventListener('click', addSkill);
-
-  // Schedule events
-  document.getElementById('add-schedule-item-btn').addEventListener('click', addScheduleItem);
-  document.getElementById('save-schedule-btn').addEventListener('click', saveSchedule);
-
-  // Subject events
-  document.getElementById('add-subject-btn').addEventListener('click', addSubject);
+  // Resume upload events
+  document.getElementById('upload-resume-btn').addEventListener('click', () => {
+    document.getElementById('resume-upload').click();
+  });
+  
+  document.getElementById('resume-upload').addEventListener('change', handleResumeUpload);
 
   // Attendance events
-  document.getElementById('mark-attendance-btn').addEventListener('click', markAttendance);
+  document.getElementById('show-timetable-btn').addEventListener('click', showTimetable);
+  document.getElementById('add-class-btn').addEventListener('click', showAddClassForm);
+  document.getElementById('mark-attendance-btn').addEventListener('click', showMarkAttendanceForm);
+  
+  document.getElementById('save-class-btn').addEventListener('click', saveClass);
+  document.getElementById('cancel-class-btn').addEventListener('click', () => {
+    document.getElementById('add-class-form').style.display = 'none';
+  });
+
+  document.getElementById('save-attendance-btn').addEventListener('click', saveAttendance);
+  document.getElementById('cancel-attendance-btn').addEventListener('click', () => {
+    document.getElementById('mark-attendance-form').style.display = 'none';
+  });
+
+  document.getElementById('close-timetable-btn').addEventListener('click', () => {
+    document.getElementById('timetable-view').style.display = 'none';
+  });
 
   // Email settings
   document.getElementById('save-email-btn').addEventListener('click', saveEmailSettings);
@@ -79,14 +122,41 @@ function showSection(sectionId) {
   document.querySelector(`[data-section="${sectionId}"]`).classList.add('active');
 }
 
-// Reminders
+// Utility function to show notifications
+function showNotification(message, type = 'info') {
+  alert(message);
+}
+
+// ===========================
+// REMINDERS SECTION
+// ===========================
+
 async function addReminder() {
   const text = document.getElementById('reminder-text').value;
-  const deadline = document.getElementById('reminder-deadline').value;
   const important = document.getElementById('reminder-important').checked;
+  const deadlineType = document.querySelector('input[name="deadline-type"]:checked').value;
 
-  if (!text || !deadline) {
-    alert('Please fill in all fields');
+  let deadline;
+  
+  if (deadlineType === 'date') {
+    deadline = document.getElementById('reminder-deadline').value;
+    if (!deadline) {
+      alert('Please select a deadline date');
+      return;
+    }
+  } else {
+    const days = parseInt(document.getElementById('reminder-days').value);
+    if (!days || days < 1) {
+      alert('Please enter a valid number of days');
+      return;
+    }
+    const deadlineDate = new Date();
+    deadlineDate.setDate(deadlineDate.getDate() + days);
+    deadline = deadlineDate.toISOString().slice(0, 16);
+  }
+
+  if (!text) {
+    alert('Please enter a reminder text');
     return;
   }
 
@@ -99,11 +169,14 @@ async function addReminder() {
   const newReminder = await ipcRenderer.invoke('save-reminder', reminder);
   appData.reminders.push(newReminder);
 
+  // Clear form
   document.getElementById('reminder-text').value = '';
   document.getElementById('reminder-deadline').value = '';
+  document.getElementById('reminder-days').value = '';
   document.getElementById('reminder-important').checked = false;
 
   renderReminders();
+  showNotification('Reminder added successfully!', 'success');
 }
 
 function renderReminders() {
@@ -111,7 +184,7 @@ function renderReminders() {
   list.innerHTML = '';
 
   if (appData.reminders.length === 0) {
-    list.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">No active reminders</p>';
+    list.innerHTML = '<p style="color: #7f8c8d; padding: 20px; text-align: center;">No active reminders</p>';
     return;
   }
 
@@ -137,7 +210,8 @@ function renderReminders() {
       timeWarning = `${hoursLeft}h left`;
       warningClass = 'red';
     } else if (percentPassed >= 50) {
-      timeWarning = '50% time passed';
+      const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+      timeWarning = `${daysLeft} days left`;
       warningClass = 'yellow';
     } else {
       const daysLeft = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
@@ -147,7 +221,7 @@ function renderReminders() {
     item.innerHTML = `
       <div class="reminder-content">
         <h3>
-          ${reminder.text}
+          ${escapeHtml(reminder.text)}
           ${reminder.important ? '<span class="badge important">IMPORTANT</span>' : ''}
         </h3>
         <p>Deadline: ${new Date(reminder.deadline).toLocaleString()}</p>
@@ -168,6 +242,8 @@ async function updateReminderStatus(id, status) {
   appData = data;
   renderReminders();
   renderHistory();
+  renderSkills();
+  showNotification('Reminder marked as ' + status, 'success');
 }
 
 async function deleteReminder(id) {
@@ -175,16 +251,20 @@ async function deleteReminder(id) {
     const data = await ipcRenderer.invoke('delete-reminder', id);
     appData = data;
     renderReminders();
+    showNotification('Reminder deleted', 'info');
   }
 }
 
-// History
+// ===========================
+// HISTORY SECTION
+// ===========================
+
 function renderHistory() {
   const list = document.getElementById('history-list');
   list.innerHTML = '';
 
   if (appData.history.length === 0) {
-    list.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">No completed reminders yet</p>';
+    list.innerHTML = '<p style="color: #7f8c8d; padding: 20px; text-align: center;">No completed reminders yet</p>';
     return;
   }
 
@@ -195,7 +275,7 @@ function renderHistory() {
     historyItem.innerHTML = `
       <div class="history-content">
         <h3>
-          ${item.text}
+          ${escapeHtml(item.text)}
           <span class="badge ${item.status}">${item.status.toUpperCase()}</span>
           ${item.important ? '<span class="badge important">IMPORTANT</span>' : ''}
         </h3>
@@ -208,254 +288,337 @@ function renderHistory() {
   });
 }
 
-// Skills
-async function addSkill() {
-  const name = document.getElementById('skill-name').value;
-  const level = document.getElementById('skill-level').value;
+// ===========================
+// RESUME & SKILLS SECTION
+// ===========================
 
-  if (!name) {
-    alert('Please enter a skill name');
+async function handleResumeUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const allowedExtensions = ['.pdf', '.doc', '.docx'];
+  const fileExtension = path.extname(file.name).toLowerCase();
+  
+  if (!allowedExtensions.includes(fileExtension)) {
+    alert('Please upload a PDF or Word document');
     return;
   }
 
-  const skill = { name, level };
-  const newSkill = await ipcRenderer.invoke('save-skill', skill);
-  appData.skills.push(newSkill);
+  // Show filename
+  document.getElementById('resume-filename').textContent = file.name;
 
-  document.getElementById('skill-name').value = '';
+  // Extract skills from resume
+  const skills = await extractSkillsFromResume(file);
+  
+  // Save to data
+  const data = await ipcRenderer.invoke('save-resume-skills', {
+    skills: skills,
+    resumePath: file.path
+  });
+  
+  appData = data;
   renderSkills();
+  showNotification('Resume uploaded and skills extracted!', 'success');
+}
+
+async function extractSkillsFromResume(file) {
+  // Read file content
+  const buffer = fs.readFileSync(file.path);
+  
+  // Convert to text (simplified - in production, use proper PDF/DOCX parsers)
+  let text = '';
+  
+  if (file.name.endsWith('.pdf')) {
+    // For PDF, we'd use pdf-parse or similar library
+    // For now, using a simple approach
+    text = buffer.toString('utf8', 0, 10000).toLowerCase();
+  } else {
+    // For DOCX, we'd use mammoth or similar
+    text = buffer.toString('utf8', 0, 10000).toLowerCase();
+  }
+
+  // Common technical skills to look for
+  const skillsDatabase = [
+    'JavaScript', 'TypeScript', 'Python', 'Java', 'C++', 'C#', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin',
+    'React', 'Angular', 'Vue.js', 'Node.js', 'Express', 'Django', 'Flask', 'Spring', 'ASP.NET',
+    'HTML', 'CSS', 'SASS', 'SCSS', 'Bootstrap', 'Tailwind',
+    'MongoDB', 'MySQL', 'PostgreSQL', 'Redis', 'Cassandra', 'Oracle',
+    'Docker', 'Kubernetes', 'AWS', 'Azure', 'Google Cloud', 'GCP', 'Heroku',
+    'Git', 'GitHub', 'GitLab', 'Jenkins', 'CI/CD', 'DevOps',
+    'Machine Learning', 'Deep Learning', 'TensorFlow', 'PyTorch', 'Keras', 'Scikit-learn',
+    'Data Science', 'Data Analysis', 'Pandas', 'NumPy', 'Matplotlib',
+    'REST API', 'GraphQL', 'WebSocket', 'Microservices',
+    'Android', 'iOS', 'Flutter', 'React Native',
+    'Linux', 'Unix', 'Windows', 'MacOS',
+    'Agile', 'Scrum', 'Jira', 'Trello',
+    'SQL', 'NoSQL', 'Firebase',
+    'Photoshop', 'Illustrator', 'Figma', 'Sketch', 'UI/UX'
+  ];
+
+  const foundSkills = [];
+  
+  for (const skill of skillsDatabase) {
+    if (text.includes(skill.toLowerCase())) {
+      foundSkills.push(skill);
+    }
+  }
+
+  return [...new Set(foundSkills)]; // Remove duplicates
 }
 
 function renderSkills() {
-  const list = document.getElementById('skills-list');
-  list.innerHTML = '';
-
-  if (appData.skills.length === 0) {
-    list.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">No skills tracked yet</p>';
-    return;
-  }
-
-  appData.skills.forEach(skill => {
-    const item = document.createElement('div');
-    item.className = 'skill-item';
-
-    item.innerHTML = `
-      <div class="skill-content">
-        <h3>${skill.name}</h3>
-        <p>Added: ${new Date(skill.addedAt).toLocaleDateString()}</p>
-      </div>
-      <div class="skill-actions">
-        <span class="skill-level ${skill.level}">${skill.level}</span>
-        <button class="btn btn-delete" onclick="deleteSkill('${skill.id}')">Delete</button>
-      </div>
-    `;
-
-    list.appendChild(item);
-  });
-}
-
-async function deleteSkill(id) {
-  if (confirm('Are you sure you want to delete this skill?')) {
-    const data = await ipcRenderer.invoke('delete-skill', id);
-    appData = data;
-    renderSkills();
-  }
-}
-
-// Schedule
-function addScheduleItem() {
-  const container = document.getElementById('schedule-items');
-  const item = document.createElement('div');
-  item.className = 'schedule-item';
-  item.innerHTML = `
-    <input type="time" class="schedule-time" value="08:00" />
-    <input type="text" class="schedule-activity" placeholder="Activity" />
-    <button onclick="this.parentElement.remove()">Remove</button>
-  `;
-  container.appendChild(item);
-}
-
-async function saveSchedule() {
-  const items = [];
-  document.querySelectorAll('.schedule-item').forEach(item => {
-    const time = item.querySelector('.schedule-time').value;
-    const activity = item.querySelector('.schedule-activity').value;
-    if (time && activity) {
-      items.push({ time, activity });
-    }
-  });
-
-  items.sort((a, b) => a.time.localeCompare(b.time));
-  const data = await ipcRenderer.invoke('save-schedule', items);
-  appData = data;
-  alert('Schedule saved successfully!');
-}
-
-function renderSchedule() {
-  const container = document.getElementById('schedule-items');
-  container.innerHTML = '';
-
-  if (appData.schedule.length === 0) {
-    addScheduleItem();
-    return;
-  }
-
-  appData.schedule.forEach(item => {
-    const scheduleItem = document.createElement('div');
-    scheduleItem.className = 'schedule-item';
-    scheduleItem.innerHTML = `
-      <input type="time" class="schedule-time" value="${item.time}" />
-      <input type="text" class="schedule-activity" value="${item.activity}" />
-      <button onclick="this.parentElement.remove()">Remove</button>
-    `;
-    container.appendChild(scheduleItem);
-  });
-}
-
-// Subjects
-async function addSubject() {
-  const name = document.getElementById('subject-name').value;
-
-  if (!name) {
-    alert('Please enter a subject name');
-    return;
-  }
-
-  if (!appData.subjects) appData.subjects = [];
+  // Resume skills
+  const resumeSkillsList = document.getElementById('resume-skills-list');
+  resumeSkillsList.innerHTML = '';
   
-  const subject = {
-    id: Date.now().toString(),
-    name
-  };
-
-  appData.subjects.push(subject);
-  await ipcRenderer.invoke('save-subjects', appData.subjects);
-
-  document.getElementById('subject-name').value = '';
-  renderSubjects();
-  updateAttendanceSubjectSelect();
-}
-
-function renderSubjects() {
-  const container = document.getElementById('subjects-list');
-  container.innerHTML = '';
-
-  if (!appData.subjects || appData.subjects.length === 0) {
-    container.innerHTML = '<p style="color: #7f8c8d; padding: 20px;">No subjects added yet</p>';
-    return;
+  if (!appData.resumeSkills || appData.resumeSkills.length === 0) {
+    resumeSkillsList.innerHTML = '<p style="color: #7f8c8d; padding: 10px;">Upload your resume to extract skills</p>';
+  } else {
+    appData.resumeSkills.forEach(skill => {
+      const tag = document.createElement('span');
+      tag.className = 'skill-tag resume-skill';
+      tag.textContent = skill;
+      resumeSkillsList.appendChild(tag);
+    });
   }
 
-  appData.subjects.forEach(subject => {
-    const card = document.createElement('div');
-    card.className = 'subject-card';
-    card.innerHTML = `
-      <h4>${subject.name}</h4>
-      <button class="btn btn-delete" onclick="deleteSubject('${subject.id}')">Delete</button>
-    `;
-    container.appendChild(card);
-  });
-
-  updateAttendanceSubjectSelect();
-}
-
-async function deleteSubject(id) {
-  if (confirm('Are you sure you want to delete this subject?')) {
-    appData.subjects = appData.subjects.filter(s => s.id !== id);
-    await ipcRenderer.invoke('save-subjects', appData.subjects);
-    renderSubjects();
-  }
-}
-
-function updateAttendanceSubjectSelect() {
-  const select = document.getElementById('attendance-subject');
-  select.innerHTML = '';
-
-  if (!appData.subjects || appData.subjects.length === 0) {
-    select.innerHTML = '<option>Add subjects first</option>';
-    return;
+  // Learned skills
+  const learnedSkillsList = document.getElementById('learned-skills-list');
+  learnedSkillsList.innerHTML = '';
+  
+  if (!appData.learnedSkills || appData.learnedSkills.length === 0) {
+    learnedSkillsList.innerHTML = '<p style="color: #7f8c8d; padding: 10px;">Complete reminders to track learned skills</p>';
+  } else {
+    appData.learnedSkills.forEach(skill => {
+      const isNew = !appData.resumeSkills || !appData.resumeSkills.includes(skill);
+      const tag = document.createElement('span');
+      tag.className = isNew ? 'skill-tag new-skill' : 'skill-tag';
+      tag.textContent = skill;
+      tag.title = isNew ? 'New skill not in resume!' : 'Already in resume';
+      learnedSkillsList.appendChild(tag);
+    });
   }
 
-  appData.subjects.forEach(subject => {
+  // Update stats
+  document.getElementById('resume-skills-count').textContent = appData.resumeSkills ? appData.resumeSkills.length : 0;
+  document.getElementById('learned-skills-count').textContent = appData.learnedSkills ? appData.learnedSkills.length : 0;
+  
+  const newSkills = appData.learnedSkills ? appData.learnedSkills.filter(skill => 
+    !appData.resumeSkills || !appData.resumeSkills.includes(skill)
+  ).length : 0;
+  document.getElementById('new-skills-count').textContent = newSkills;
+}
+
+// ===========================
+// ATTENDANCE SECTION
+// ===========================
+
+function showAddClassForm() {
+  document.getElementById('add-class-form').style.display = 'block';
+  document.getElementById('mark-attendance-form').style.display = 'none';
+  document.getElementById('timetable-view').style.display = 'none';
+}
+
+function showMarkAttendanceForm() {
+  document.getElementById('add-class-form').style.display = 'none';
+  document.getElementById('mark-attendance-form').style.display = 'block';
+  document.getElementById('timetable-view').style.display = 'none';
+  
+  // Populate class dropdown
+  const select = document.getElementById('attendance-class');
+  select.innerHTML = '<option value="">Select Class</option>';
+  
+  appData.classes.forEach(cls => {
     const option = document.createElement('option');
-    option.value = subject.id;
-    option.textContent = subject.name;
+    option.value = cls.id;
+    option.textContent = `${cls.name} (${cls.code})`;
     select.appendChild(option);
   });
 }
 
-// Attendance
-async function markAttendance() {
-  const subjectId = document.getElementById('attendance-subject').value;
-  const day = document.getElementById('attendance-day').value;
-  const date = document.getElementById('attendance-date').value;
+function showTimetable() {
+  document.getElementById('add-class-form').style.display = 'none';
+  document.getElementById('mark-attendance-form').style.display = 'none';
+  document.getElementById('timetable-view').style.display = 'block';
+  
+  renderTimetable();
+}
 
-  if (!subjectId || !day || !date) {
+async function saveClass() {
+  const name = document.getElementById('class-name').value;
+  const code = document.getElementById('class-code').value;
+  const professor = document.getElementById('professor-name').value;
+  const day = document.getElementById('class-day').value;
+  const startTime = document.getElementById('class-start-time').value;
+  const endTime = document.getElementById('class-end-time').value;
+
+  if (!name || !code || !professor || !day || !startTime || !endTime) {
     alert('Please fill in all fields');
     return;
   }
 
-  const subject = appData.subjects.find(s => s.id === subjectId);
-  if (!subject) {
-    alert('Subject not found');
+  const classData = {
+    name,
+    code,
+    professor,
+    day,
+    startTime,
+    endTime
+  };
+
+  const data = await ipcRenderer.invoke('save-class', classData);
+  appData = data;
+  
+  // Clear form
+  document.getElementById('class-name').value = '';
+  document.getElementById('class-code').value = '';
+  document.getElementById('professor-name').value = '';
+  document.getElementById('class-day').value = '';
+  document.getElementById('class-start-time').value = '';
+  document.getElementById('class-end-time').value = '';
+  
+  document.getElementById('add-class-form').style.display = 'none';
+  renderClasses();
+  renderAttendanceStats();
+  showNotification('Class added successfully!', 'success');
+}
+
+async function saveAttendance() {
+  const classId = document.getElementById('attendance-class').value;
+  const date = document.getElementById('attendance-date').value;
+  const status = document.getElementById('attendance-status').value;
+
+  if (!classId || !date) {
+    alert('Please fill in all fields');
     return;
   }
 
-  const record = {
-    subjectId,
-    subjectName: subject.name,
-    day,
-    date
+  const classData = appData.classes.find(c => c.id === classId);
+  
+  const attendanceRecord = {
+    classId,
+    className: classData.name,
+    classCode: classData.code,
+    date,
+    status
   };
 
-  const data = await ipcRenderer.invoke('mark-attendance', record);
+  const data = await ipcRenderer.invoke('save-attendance', attendanceRecord);
   appData = data;
+  
+  document.getElementById('mark-attendance-form').style.display = 'none';
   renderAttendanceStats();
+  showNotification('Attendance marked!', 'success');
+}
+
+function renderTimetable() {
+  const grid = document.getElementById('timetable-grid');
+  
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const timeSlots = {};
+  
+  // Organize classes by day
+  days.forEach(day => {
+    timeSlots[day] = appData.classes.filter(cls => cls.day === day).sort((a, b) => 
+      a.startTime.localeCompare(b.startTime)
+    );
+  });
+
+  let tableHTML = '<table class="timetable-table"><thead><tr><th>Day</th><th>Classes</th></tr></thead><tbody>';
+  
+  days.forEach(day => {
+    tableHTML += `<tr><td><strong>${day}</strong></td><td>`;
+    
+    if (timeSlots[day].length === 0) {
+      tableHTML += '<em style="color: #7f8c8d;">No classes</em>';
+    } else {
+      timeSlots[day].forEach(cls => {
+        tableHTML += `
+          <div class="timetable-class">
+            <div class="class-name">${cls.name} (${cls.code})</div>
+            <div class="class-time">${cls.startTime} - ${cls.endTime}</div>
+            <div class="professor-name">Prof. ${cls.professor}</div>
+          </div>
+        `;
+      });
+    }
+    
+    tableHTML += '</td></tr>';
+  });
+  
+  tableHTML += '</tbody></table>';
+  grid.innerHTML = tableHTML;
+}
+
+function renderClasses() {
+  const container = document.getElementById('classes-list');
+  container.innerHTML = '';
+
+  if (appData.classes.length === 0) {
+    container.innerHTML = '<p style="color: #7f8c8d; padding: 20px; text-align: center;">No classes added yet</p>';
+    return;
+  }
+
+  appData.classes.forEach(cls => {
+    const card = document.createElement('div');
+    card.className = 'class-card';
+    card.innerHTML = `
+      <h4>${escapeHtml(cls.name)}</h4>
+      <div class="class-code">${escapeHtml(cls.code)}</div>
+      <div class="professor">Prof. ${escapeHtml(cls.professor)}</div>
+      <div class="schedule">${cls.day}, ${cls.startTime} - ${cls.endTime}</div>
+      <button class="btn btn-delete" onclick="deleteClass('${cls.id}')">Delete</button>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function deleteClass(id) {
+  if (confirm('Are you sure? This will also delete all attendance records for this class.')) {
+    const data = await ipcRenderer.invoke('delete-class', id);
+    appData = data;
+    renderClasses();
+    renderAttendanceStats();
+    showNotification('Class deleted', 'info');
+  }
 }
 
 function renderAttendanceStats() {
-  const container = document.getElementById('attendance-stats');
-  container.innerHTML = '<h3>Attendance Statistics</h3>';
+  const container = document.getElementById('attendance-stats-grid');
+  container.innerHTML = '';
 
-  if (!appData.attendance || appData.attendance.length === 0) {
-    container.innerHTML += '<p style="color: #7f8c8d;">No attendance records yet</p>';
+  if (appData.classes.length === 0) {
+    container.innerHTML = '<p style="color: #7f8c8d; padding: 20px; text-align: center;">Add classes to track attendance</p>';
     return;
   }
 
-  const stats = {};
-  appData.subjects.forEach(subject => {
-    const count = appData.attendance.filter(a => a.subjectId === subject.id).length;
-    stats[subject.name] = count;
-  });
+  appData.classes.forEach(cls => {
+    const attendanceRecords = appData.attendance.filter(a => a.classId === cls.id);
+    const presentCount = attendanceRecords.filter(a => a.status === 'present').length;
+    const totalCount = attendanceRecords.length;
+    const percentage = totalCount > 0 ? ((presentCount / totalCount) * 100).toFixed(1) : 0;
 
-  Object.keys(stats).forEach(subjectName => {
-    const row = document.createElement('div');
-    row.className = 'stat-row';
-    row.innerHTML = `
-      <span><strong>${subjectName}</strong></span>
-      <span>${stats[subjectName]} classes attended</span>
+    const card = document.createElement('div');
+    card.className = 'class-stat-card';
+    card.innerHTML = `
+      <h4>${escapeHtml(cls.name)}</h4>
+      <div class="professor">Prof. ${escapeHtml(cls.professor)}</div>
+      <div class="attendance-bar">
+        <div class="attendance-fill" style="width: ${percentage}%">${percentage}%</div>
+      </div>
+      <div class="attendance-details">
+        <span>Present: ${presentCount}</span>
+        <span>Total: ${totalCount}</span>
+      </div>
     `;
-    container.appendChild(row);
+    container.appendChild(card);
   });
-
-
-  const recent = document.createElement('div');
-  recent.style.marginTop = '20px';
-  recent.innerHTML = '<h4>Recent Attendance</h4>';
-  
-  appData.attendance.slice(-10).reverse().forEach(record => {
-    const entry = document.createElement('div');
-    entry.className = 'stat-row';
-    entry.innerHTML = `
-      <span>${record.subjectName} - ${record.day}</span>
-      <span>${new Date(record.date).toLocaleDateString()}</span>
-    `;
-    recent.appendChild(entry);
-  });
-  
-  container.appendChild(recent);
 }
 
-// Email Settings
+// ===========================
+// EMAIL SETTINGS
+// ===========================
+
 async function saveEmailSettings() {
   const enabled = document.getElementById('email-enabled').checked;
   const email = document.getElementById('email-address').value;
@@ -476,7 +639,7 @@ async function saveEmailSettings() {
 
   await ipcRenderer.invoke('save-email-config', config);
   appData.emailConfig = config;
-  alert('Email settings saved successfully!');
+  showNotification('Email settings saved successfully!', 'success');
 }
 
 function loadEmailSettings() {
@@ -488,7 +651,10 @@ function loadEmailSettings() {
   }
 }
 
-// About Modal
+// ===========================
+// MODAL FUNCTIONS
+// ===========================
+
 function showAboutModal() {
   document.getElementById('about-modal').style.display = 'block';
 }
@@ -497,8 +663,17 @@ function closeAboutModal() {
   document.getElementById('about-modal').style.display = 'none';
 }
 
+// ===========================
+// UTILITY FUNCTIONS
+// ===========================
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // Make functions globally available
 window.updateReminderStatus = updateReminderStatus;
 window.deleteReminder = deleteReminder;
-window.deleteSkill = deleteSkill;
-window.deleteSubject = deleteSubject;
+window.deleteClass = deleteClass;
