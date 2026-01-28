@@ -4,18 +4,6 @@ A feature-rich **offline desktop application** built using **Electron** to manag
 
 ---
 
-## 👤 Author / Credits
-
-**Developed by:**  
-**Your Name**  
-
-- GitHub: https://github.com/your-username  
-- LinkedIn: https://linkedin.com/in/your-profile  
-- Email: your.email@example.com  
-
-> This project was designed and developed as a personal productivity tool and as a portfolio-ready desktop application.
-
----
 
 ## ✨ Features
 
@@ -68,7 +56,7 @@ A feature-rich **offline desktop application** built using **Electron** to manag
 
 ---
 
-### 6. Email Notifications (Optional)
+### 6. Email Notifications 
 - Email alerts for reminders
 - Supported services:
   - Gmail
@@ -99,6 +87,6 @@ A feature-rich **offline desktop application** built using **Electron** to manag
 ### Installation
 
 ```bash
-cd reminder-app
+cd reminder-electron
 npm install
 npm start
