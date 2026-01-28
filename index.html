@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reminder App</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="sidebar">
+      <h2>Reminder App</h2>
+      <ul>
+        <li><a href="#" data-section="reminders" class="nav-link active">Reminders</a></li>
+        <li><a href="#" data-section="history" class="nav-link">History</a></li>
+        <li><a href="#" data-section="skills" class="nav-link">Technical Skills</a></li>
+        <li><a href="#" data-section="schedule" class="nav-link">Daily Schedule</a></li>
+        <li><a href="#" data-section="attendance" class="nav-link">Attendance</a></li>
+        <li><a href="#" data-section="settings" class="nav-link">Email Settings</a></li>
+      </ul>
+    </nav>
+
+    <main class="main-content">
+      <!-- Reminders Section -->
+      <section id="reminders" class="section active">
+        <h1>Reminders</h1>
+        <div class="add-form">
+          <input type="text" id="reminder-text" placeholder="What do you need to do?" />
+          <input type="datetime-local" id="reminder-deadline" />
+          <label class="toggle-label">
+            <input type="checkbox" id="reminder-important" />
+            <span>Important</span>
+          </label>
+          <button id="add-reminder-btn">Add Reminder</button>
+        </div>
+        <div id="reminders-list" class="list"></div>
+      </section>
+
+      <!-- History Section -->
+      <section id="history" class="section">
+        <h1>History</h1>
+        <div id="history-list" class="list"></div>
+      </section>
+
+      <!-- Technical Skills Section -->
+      <section id="skills" class="section">
+        <h1>Technical Skills Tracker</h1>
+        <div class="add-form">
+          <input type="text" id="skill-name" placeholder="Skill name (e.g., React.js)" />
+          <select id="skill-level">
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+            <option value="expert">Expert</option>
+          </select>
+          <button id="add-skill-btn">Add Skill</button>
+        </div>
+        <div id="skills-list" class="list"></div>
+      </section>
+
+      <!-- Daily Schedule Section -->
+      <section id="schedule" class="section">
+        <h1>Daily Schedule</h1>
+        <div class="schedule-form">
+          <div id="schedule-items"></div>
+          <button id="add-schedule-item-btn">+ Add Time Slot</button>
+          <button id="save-schedule-btn">Save Schedule</button>
+        </div>
+      </section>
+
+      <!-- Attendance Section -->
+      <section id="attendance" class="section">
+        <h1>Attendance Tracker</h1>
+        <div class="attendance-setup">
+          <h3>Subjects</h3>
+          <div class="add-form">
+            <input type="text" id="subject-name" placeholder="Subject name" />
+            <button id="add-subject-btn">Add Subject</button>
+          </div>
+          <div id="subjects-list" class="subjects-grid"></div>
+        </div>
+        <div class="attendance-tracker">
+          <h3>Mark Attendance</h3>
+          <div class="add-form">
+            <select id="attendance-subject"></select>
+            <select id="attendance-day">
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+              <option value="Friday">Friday</option>
+            </select>
+            <input type="date" id="attendance-date" />
+            <button id="mark-attendance-btn">Mark Present</button>
+          </div>
+          <div id="attendance-stats" class="stats"></div>
+        </div>
+      </section>
+
+      <!-- Settings Section -->
+      <section id="settings" class="section">
+        <h1>Email Notification Settings</h1>
+        <div class="settings-form">
+          <label class="toggle-label">
+            <input type="checkbox" id="email-enabled" />
+            <span>Enable Email Notifications</span>
+          </label>
+          <input type="email" id="email-address" placeholder="Your email address" />
+          <input type="password" id="email-password" placeholder="App password" />
+          <select id="email-service">
+            <option value="gmail">Gmail</option>
+            <option value="outlook">Outlook</option>
+            <option value="yahoo">Yahoo</option>
+          </select>
+          <button id="save-email-btn">Save Settings</button>
+          <p class="note">Note: For Gmail, use App Password instead of regular password. Enable 2FA and generate an App Password from Google Account settings.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- About Modal -->
+  <div id="about-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="about-content">
+        <img src="https://iiitsonepat.ac.in/uploads/1768819973674-WhatsApp%20Image%202026-01-19%20at%2016.06.30.jpeg" alt="Profile Photo" class="profile-photo" />
+        <h2>About Developer</h2>
+        <p><strong>Name:</strong> Sameet Patro</p>
+        <p><strong>LinkedIn:</strong> <a href="https://linkedin.com/in/sameet-patro-257257280" target="_blank">linkedin.com/in/sameet-patro-257257280</a></p>
+        <p><strong>GitHub:</strong> <a href="https://github.com/sameetpatro" target="_blank">github.com/sameetpatro</a></p>
+        <p><strong>Email:</strong> sameetpatratsp2004@gmail.com</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
